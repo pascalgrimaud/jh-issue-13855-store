@@ -41,6 +41,7 @@
     "nativeLanguage": "en",
     "creationTimestamp": 1613221472505,
     "lastLiquibaseTimestamp": 1613221832000,
-    "entities": ["Invoice", "Customer", "Shipment", "Product", "ProductOrder", "OrderItem"]
+    "entities": ["Invoice", "Customer", "Shipment", "Product", "ProductOrder", "OrderItem"],
+    "appFolder": "store"
   }
 }
