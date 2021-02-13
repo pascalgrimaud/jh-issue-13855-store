@@ -84,7 +84,7 @@
             <option *ngIf="!editForm.get('customer')!.value" [ngValue]="null" selected></option>
             <option
               [ngValue]="customerOption.id === editForm.get('customer')!.value?.id ? editForm.get('customer')!.value : customerOption"
-              *ngFor="let customerOption of customers; trackBy: trackCustomerById"
+              *ngFor="let customerOption of customersSharedCollection; trackBy: trackCustomerById"
             >
               {{ customerOption.email }}
             </option>

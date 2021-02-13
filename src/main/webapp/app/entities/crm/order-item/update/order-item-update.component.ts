@@ -3,6 +3,7 @@ import { HttpResponse } from '@angular/common/http';
 import { FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { Observable } from 'rxjs';
+import { finalize, map } from 'rxjs/operators';
 
 import { IOrderItem, OrderItem } from '../order-item.model';
 import { OrderItemService } from '../service/order-item.service';
@@ -17,8 +18,9 @@ import { ProductOrderService } from 'app/entities/crm/product-order/service/prod
 })
 export class OrderItemUpdateComponent implements OnInit {
   isSaving = false;
-  products: IProduct[] = [];
-  productorders: IProductOrder[] = [];
+
+  productsSharedCollection: IProduct[] = [];
+  productOrdersSharedCollection: IProductOrder[] = [];
 
   editForm = this.fb.group({
     id: [],
@@ -34,27 +36,14 @@ export class OrderItemUpdateComponent implements OnInit {
     protected productService: ProductService,
     protected productOrderService: ProductOrderService,
     protected activatedRoute: ActivatedRoute,
-    private fb: FormBuilder
+    protected fb: FormBuilder
   ) {}
 
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ orderItem }) => {
       this.updateForm(orderItem);
 
-      this.productService.query().subscribe((res: HttpResponse<IProduct[]>) => (this.products = res.body ?? []));
-
-      this.productOrderService.query().subscribe((res: HttpResponse<IProductOrder[]>) => (this.productorders = res.body ?? []));
-    });
-  }
-
-  updateForm(orderItem: IOrderItem): void {
-    this.editForm.patchValue({
-      id: orderItem.id,
-      quantity: orderItem.quantity,
-      totalPrice: orderItem.totalPrice,
-      status: orderItem.status,
-      product: orderItem.product,
-      order: orderItem.order,
+      this.loadRelationshipsOptions();
     });
   }
 
@@ -72,7 +61,71 @@ export class OrderItemUpdateComponent implements OnInit {
     }
   }
 
-  private createFromForm(): IOrderItem {
+  trackProductById(index: number, item: IProduct): number {
+    return item.id!;
+  }
+
+  trackProductOrderById(index: number, item: IProductOrder): number {
+    return item.id!;
+  }
+
+  protected subscribeToSaveResponse(result: Observable<HttpResponse<IOrderItem>>): void {
+    result.pipe(finalize(() => this.onSaveFinalize())).subscribe(
+      () => this.onSaveSuccess(),
+      () => this.onSaveError()
+    );
+  }
+
+  protected onSaveSuccess(): void {
+    this.previousState();
+  }
+
+  protected onSaveError(): void {
+    // Api for inheritance.
+  }
+
+  protected onSaveFinalize(): void {
+    this.isSaving = false;
+  }
+
+  protected updateForm(orderItem: IOrderItem): void {
+    this.editForm.patchValue({
+      id: orderItem.id,
+      quantity: orderItem.quantity,
+      totalPrice: orderItem.totalPrice,
+      status: orderItem.status,
+      product: orderItem.product,
+      order: orderItem.order,
+    });
+
+    this.productsSharedCollection = this.productService.addProductToCollectionIfMissing(this.productsSharedCollection, orderItem.product);
+    this.productOrdersSharedCollection = this.productOrderService.addProductOrderToCollectionIfMissing(
+      this.productOrdersSharedCollection,
+      orderItem.order
+    );
+  }
+
+  protected loadRelationshipsOptions(): void {
+    this.productService
+      .query()
+      .pipe(map((res: HttpResponse<IProduct[]>) => res.body ?? []))
+      .pipe(
+        map((products: IProduct[]) => this.productService.addProductToCollectionIfMissing(products, this.editForm.get('product')!.value))
+      )
+      .subscribe((products: IProduct[]) => (this.productsSharedCollection = products));
+
+    this.productOrderService
+      .query()
+      .pipe(map((res: HttpResponse<IProductOrder[]>) => res.body ?? []))
+      .pipe(
+        map((productOrders: IProductOrder[]) =>
+          this.productOrderService.addProductOrderToCollectionIfMissing(productOrders, this.editForm.get('order')!.value)
+        )
+      )
+      .subscribe((productOrders: IProductOrder[]) => (this.productOrdersSharedCollection = productOrders));
+  }
+
+  protected createFromForm(): IOrderItem {
     return {
       ...new OrderItem(),
       id: this.editForm.get(['id'])!.value,
@@ -82,29 +135,5 @@ export class OrderItemUpdateComponent implements OnInit {
       product: this.editForm.get(['product'])!.value,
       order: this.editForm.get(['order'])!.value,
     };
-  }
-
-  protected subscribeToSaveResponse(result: Observable<HttpResponse<IOrderItem>>): void {
-    result.subscribe(
-      () => this.onSaveSuccess(),
-      () => this.onSaveError()
-    );
-  }
-
-  protected onSaveSuccess(): void {
-    this.isSaving = false;
-    this.previousState();
-  }
-
-  protected onSaveError(): void {
-    this.isSaving = false;
-  }
-
-  trackProductById(index: number, item: IProduct): number {
-    return item.id!;
-  }
-
-  trackProductOrderById(index: number, item: IProductOrder): number {
-    return item.id!;
   }
 }

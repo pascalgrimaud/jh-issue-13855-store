@@ -63,7 +63,7 @@
             <option *ngIf="!editForm.get('invoice')!.value" [ngValue]="null" selected></option>
             <option
               [ngValue]="invoiceOption.id === editForm.get('invoice')!.value?.id ? editForm.get('invoice')!.value : invoiceOption"
-              *ngFor="let invoiceOption of invoices; trackBy: trackInvoiceById"
+              *ngFor="let invoiceOption of invoicesSharedCollection; trackBy: trackInvoiceById"
             >
               {{ invoiceOption.code }}
             </option>

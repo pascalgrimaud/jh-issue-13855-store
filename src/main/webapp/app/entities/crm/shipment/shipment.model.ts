@@ -18,3 +18,7 @@ export class Shipment implements IShipment {
     public invoice?: IInvoice
   ) {}
 }
+
+export function getShipmentIdentifier(shipment: IShipment): number | undefined {
+  return shipment.id;
+}

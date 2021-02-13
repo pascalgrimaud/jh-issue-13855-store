@@ -1,16 +1,18 @@
 jest.mock('@angular/router');
 
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpResponse } from '@angular/common/http';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { FormBuilder } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 
 import { OrderItemService } from '../service/order-item.service';
-import { OrderItem } from '../order-item.model';
-import { Product } from 'app/entities/crm/product/product.model';
-import { ProductOrder } from 'app/entities/crm/product-order/product-order.model';
+import { IOrderItem, OrderItem } from '../order-item.model';
+import { IProduct, Product } from 'app/entities/crm/product/product.model';
+import { ProductService } from 'app/entities/crm/product/service/product.service';
+import { IProductOrder, ProductOrder } from 'app/entities/crm/product-order/product-order.model';
+import { ProductOrderService } from 'app/entities/crm/product-order/service/product-order.service';
 
 import { OrderItemUpdateComponent } from './order-item-update.component';
 
@@ -18,7 +20,10 @@ describe('Component Tests', () => {
   describe('OrderItem Management Update Component', () => {
     let comp: OrderItemUpdateComponent;
     let fixture: ComponentFixture<OrderItemUpdateComponent>;
-    let service: OrderItemService;
+    let activatedRoute: ActivatedRoute;
+    let orderItemService: OrderItemService;
+    let productService: ProductService;
+    let productOrderService: ProductOrderService;
 
     beforeEach(() => {
       TestBed.configureTestingModule({
@@ -30,38 +35,134 @@ describe('Component Tests', () => {
         .compileComponents();
 
       fixture = TestBed.createComponent(OrderItemUpdateComponent);
+      activatedRoute = TestBed.inject(ActivatedRoute);
+      orderItemService = TestBed.inject(OrderItemService);
+      productService = TestBed.inject(ProductService);
+      productOrderService = TestBed.inject(ProductOrderService);
+
       comp = fixture.componentInstance;
-      service = TestBed.inject(OrderItemService);
+    });
+
+    describe('ngOnInit', () => {
+      it('Should call Product query and add missing value', () => {
+        const orderItem: IOrderItem = { id: 456 };
+        const product: IProduct = { id: 32637 };
+        orderItem.product = product;
+
+        const productCollection: IProduct[] = [{ id: 38341 }];
+        spyOn(productService, 'query').and.returnValue(of(new HttpResponse({ body: productCollection })));
+        const additionalProducts = [product];
+        const expectedCollection: IProduct[] = [...additionalProducts, ...productCollection];
+        spyOn(productService, 'addProductToCollectionIfMissing').and.returnValue(expectedCollection);
+
+        activatedRoute.data = of({ orderItem });
+        comp.ngOnInit();
+
+        expect(productService.query).toHaveBeenCalled();
+        expect(productService.addProductToCollectionIfMissing).toHaveBeenCalledWith(productCollection, ...additionalProducts);
+        expect(comp.productsSharedCollection).toEqual(expectedCollection);
+      });
+
+      it('Should call ProductOrder query and add missing value', () => {
+        const orderItem: IOrderItem = { id: 456 };
+        const order: IProductOrder = { id: 54520 };
+        orderItem.order = order;
+
+        const productOrderCollection: IProductOrder[] = [{ id: 72110 }];
+        spyOn(productOrderService, 'query').and.returnValue(of(new HttpResponse({ body: productOrderCollection })));
+        const additionalProductOrders = [order];
+        const expectedCollection: IProductOrder[] = [...additionalProductOrders, ...productOrderCollection];
+        spyOn(productOrderService, 'addProductOrderToCollectionIfMissing').and.returnValue(expectedCollection);
+
+        activatedRoute.data = of({ orderItem });
+        comp.ngOnInit();
+
+        expect(productOrderService.query).toHaveBeenCalled();
+        expect(productOrderService.addProductOrderToCollectionIfMissing).toHaveBeenCalledWith(
+          productOrderCollection,
+          ...additionalProductOrders
+        );
+        expect(comp.productOrdersSharedCollection).toEqual(expectedCollection);
+      });
+
+      it('Should update editForm', () => {
+        const orderItem: IOrderItem = { id: 456 };
+        const product: IProduct = { id: 24236 };
+        orderItem.product = product;
+        const order: IProductOrder = { id: 83101 };
+        orderItem.order = order;
+
+        activatedRoute.data = of({ orderItem });
+        comp.ngOnInit();
+
+        expect(comp.editForm.value).toEqual(expect.objectContaining(orderItem));
+        expect(comp.productsSharedCollection).toContain(product);
+        expect(comp.productOrdersSharedCollection).toContain(order);
+      });
     });
 
     describe('save', () => {
-      it('Should call update service on save for existing entity', fakeAsync(() => {
+      it('Should call update service on save for existing entity', () => {
         // GIVEN
-        const entity = new OrderItem(123);
-        spyOn(service, 'update').and.returnValue(of(new HttpResponse({ body: entity })));
-        comp.updateForm(entity);
+        const saveSubject = new Subject();
+        const orderItem = new OrderItem(123);
+        spyOn(orderItemService, 'update').and.returnValue(saveSubject);
+        spyOn(comp, 'previousState');
+        activatedRoute.data = of({ orderItem });
+        comp.ngOnInit();
+
         // WHEN
         comp.save();
-        tick(); // simulate async
+        expect(comp.isSaving).toEqual(true);
+        saveSubject.next(new HttpResponse({ body: orderItem }));
+        saveSubject.complete();
 
         // THEN
-        expect(service.update).toHaveBeenCalledWith(entity);
+        expect(comp.previousState).toHaveBeenCalled();
+        expect(orderItemService.update).toHaveBeenCalledWith(orderItem);
         expect(comp.isSaving).toEqual(false);
-      }));
+      });
 
-      it('Should call create service on save for new entity', fakeAsync(() => {
+      it('Should call create service on save for new entity', () => {
         // GIVEN
-        const entity = new OrderItem();
-        spyOn(service, 'create').and.returnValue(of(new HttpResponse({ body: entity })));
-        comp.updateForm(entity);
+        const saveSubject = new Subject();
+        const orderItem = new OrderItem();
+        spyOn(orderItemService, 'create').and.returnValue(saveSubject);
+        spyOn(comp, 'previousState');
+        activatedRoute.data = of({ orderItem });
+        comp.ngOnInit();
+
         // WHEN
         comp.save();
-        tick(); // simulate async
+        expect(comp.isSaving).toEqual(true);
+        saveSubject.next(new HttpResponse({ body: orderItem }));
+        saveSubject.complete();
 
         // THEN
-        expect(service.create).toHaveBeenCalledWith(entity);
+        expect(orderItemService.create).toHaveBeenCalledWith(orderItem);
         expect(comp.isSaving).toEqual(false);
-      }));
+        expect(comp.previousState).toHaveBeenCalled();
+      });
+
+      it('Should set isSaving to false on error', () => {
+        // GIVEN
+        const saveSubject = new Subject();
+        const orderItem = new OrderItem(123);
+        spyOn(orderItemService, 'update').and.returnValue(saveSubject);
+        spyOn(comp, 'previousState');
+        activatedRoute.data = of({ orderItem });
+        comp.ngOnInit();
+
+        // WHEN
+        comp.save();
+        expect(comp.isSaving).toEqual(true);
+        saveSubject.error('This is an error!');
+
+        // THEN
+        expect(orderItemService.update).toHaveBeenCalledWith(orderItem);
+        expect(comp.isSaving).toEqual(false);
+        expect(comp.previousState).not.toHaveBeenCalled();
+      });
     });
 
     describe('Tracking relationships identifiers', () => {

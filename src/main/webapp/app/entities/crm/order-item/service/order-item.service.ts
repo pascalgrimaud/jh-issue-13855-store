@@ -2,18 +2,19 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-import { SERVER_API_URL } from 'app/app.constants';
+import { isPresent } from 'app/core/util/operators';
+import { ConfigService } from 'app/core/config/config.service';
 import { createRequestOption } from 'app/core/request/request-util';
-import { IOrderItem } from '../order-item.model';
+import { IOrderItem, getOrderItemIdentifier } from '../order-item.model';
 
-type EntityResponseType = HttpResponse<IOrderItem>;
-type EntityArrayResponseType = HttpResponse<IOrderItem[]>;
+export type EntityResponseType = HttpResponse<IOrderItem>;
+export type EntityArrayResponseType = HttpResponse<IOrderItem[]>;
 
 @Injectable({ providedIn: 'root' })
 export class OrderItemService {
-  public resourceUrl = SERVER_API_URL + 'services/crm/api/order-items';
+  public resourceUrl = this.configService.getEndpointFor('api/order-items', 'crm');
 
-  constructor(protected http: HttpClient) {}
+  constructor(protected http: HttpClient, private configService: ConfigService) {}
 
   create(orderItem: IOrderItem): Observable<EntityResponseType> {
     return this.http.post<IOrderItem>(this.resourceUrl, orderItem, { observe: 'response' });
@@ -34,5 +35,25 @@ export class OrderItemService {
 
   delete(id: number): Observable<HttpResponse<{}>> {
     return this.http.delete(`${this.resourceUrl}/${id}`, { observe: 'response' });
+  }
+
+  addOrderItemToCollectionIfMissing(
+    orderItemCollection: IOrderItem[],
+    ...orderItemsToCheck: (IOrderItem | null | undefined)[]
+  ): IOrderItem[] {
+    const orderItems: IOrderItem[] = orderItemsToCheck.filter(isPresent);
+    if (orderItems.length > 0) {
+      const orderItemCollectionIdentifiers = orderItemCollection.map(orderItemItem => getOrderItemIdentifier(orderItemItem)!);
+      const orderItemsToAdd = orderItems.filter(orderItemItem => {
+        const orderItemIdentifier = getOrderItemIdentifier(orderItemItem);
+        if (orderItemIdentifier == null || orderItemCollectionIdentifiers.includes(orderItemIdentifier)) {
+          return false;
+        }
+        orderItemCollectionIdentifiers.push(orderItemIdentifier);
+        return true;
+      });
+      return [...orderItemsToAdd, ...orderItemCollection];
+    }
+    return orderItemCollection;
   }
 }

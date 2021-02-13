@@ -124,6 +124,58 @@ describe('Service Tests', () => {
         req.flush({ status: 200 });
         expect(expectedResult);
       });
+
+      describe('addShipmentToCollectionIfMissing', () => {
+        it('should add a Shipment to an empty array', () => {
+          const shipment: IShipment = { id: 123 };
+          expectedResult = service.addShipmentToCollectionIfMissing([], shipment);
+          expect(expectedResult).toHaveLength(1);
+          expect(expectedResult).toContain(shipment);
+        });
+
+        it('should not add a Shipment to an array that contains it', () => {
+          const shipment: IShipment = { id: 123 };
+          const shipmentCollection: IShipment[] = [
+            {
+              ...shipment,
+            },
+            { id: 456 },
+          ];
+          expectedResult = service.addShipmentToCollectionIfMissing(shipmentCollection, shipment);
+          expect(expectedResult).toHaveLength(2);
+        });
+
+        it("should add a Shipment to an array that doesn't contain it", () => {
+          const shipment: IShipment = { id: 123 };
+          const shipmentCollection: IShipment[] = [{ id: 456 }];
+          expectedResult = service.addShipmentToCollectionIfMissing(shipmentCollection, shipment);
+          expect(expectedResult).toHaveLength(2);
+          expect(expectedResult).toContain(shipment);
+        });
+
+        it('should add only unique Shipment to an array', () => {
+          const shipmentArray: IShipment[] = [{ id: 123 }, { id: 456 }, { id: 38511 }];
+          const shipmentCollection: IShipment[] = [{ id: 456 }];
+          expectedResult = service.addShipmentToCollectionIfMissing(shipmentCollection, ...shipmentArray);
+          expect(expectedResult).toHaveLength(3);
+        });
+
+        it('should accept varargs', () => {
+          const shipment: IShipment = { id: 123 };
+          const shipment2: IShipment = { id: 456 };
+          expectedResult = service.addShipmentToCollectionIfMissing([], shipment, shipment2);
+          expect(expectedResult).toHaveLength(2);
+          expect(expectedResult).toContain(shipment);
+          expect(expectedResult).toContain(shipment2);
+        });
+
+        it('should accept null and undefined values', () => {
+          const shipment: IShipment = { id: 123 };
+          expectedResult = service.addShipmentToCollectionIfMissing([], null, shipment, undefined);
+          expect(expectedResult).toHaveLength(1);
+          expect(expectedResult).toContain(shipment);
+        });
+      });
     });
 
     afterEach(() => {

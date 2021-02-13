@@ -3,6 +3,7 @@ import { HttpResponse } from '@angular/common/http';
 import { FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { Observable } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { IProduct, Product } from '../product.model';
 import { ProductService } from '../service/product.service';
@@ -33,24 +34,12 @@ export class ProductUpdateComponent implements OnInit {
     protected productService: ProductService,
     protected elementRef: ElementRef,
     protected activatedRoute: ActivatedRoute,
-    private fb: FormBuilder
+    protected fb: FormBuilder
   ) {}
 
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ product }) => {
       this.updateForm(product);
-    });
-  }
-
-  updateForm(product: IProduct): void {
-    this.editForm.patchValue({
-      id: product.id,
-      name: product.name,
-      description: product.description,
-      price: product.price,
-      size: product.size,
-      image: product.image,
-      imageContentType: product.imageContentType,
     });
   }
 
@@ -95,7 +84,38 @@ export class ProductUpdateComponent implements OnInit {
     }
   }
 
-  private createFromForm(): IProduct {
+  protected subscribeToSaveResponse(result: Observable<HttpResponse<IProduct>>): void {
+    result.pipe(finalize(() => this.onSaveFinalize())).subscribe(
+      () => this.onSaveSuccess(),
+      () => this.onSaveError()
+    );
+  }
+
+  protected onSaveSuccess(): void {
+    this.previousState();
+  }
+
+  protected onSaveError(): void {
+    // Api for inheritance.
+  }
+
+  protected onSaveFinalize(): void {
+    this.isSaving = false;
+  }
+
+  protected updateForm(product: IProduct): void {
+    this.editForm.patchValue({
+      id: product.id,
+      name: product.name,
+      description: product.description,
+      price: product.price,
+      size: product.size,
+      image: product.image,
+      imageContentType: product.imageContentType,
+    });
+  }
+
+  protected createFromForm(): IProduct {
     return {
       ...new Product(),
       id: this.editForm.get(['id'])!.value,
@@ -106,21 +126,5 @@ export class ProductUpdateComponent implements OnInit {
       imageContentType: this.editForm.get(['imageContentType'])!.value,
       image: this.editForm.get(['image'])!.value,
     };
-  }
-
-  protected subscribeToSaveResponse(result: Observable<HttpResponse<IProduct>>): void {
-    result.subscribe(
-      () => this.onSaveSuccess(),
-      () => this.onSaveError()
-    );
-  }
-
-  protected onSaveSuccess(): void {
-    this.isSaving = false;
-    this.previousState();
-  }
-
-  protected onSaveError(): void {
-    this.isSaving = false;
   }
 }

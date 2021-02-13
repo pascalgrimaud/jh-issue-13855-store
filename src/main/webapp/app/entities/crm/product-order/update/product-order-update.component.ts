@@ -3,6 +3,8 @@ import { HttpResponse } from '@angular/common/http';
 import { FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { Observable } from 'rxjs';
+import { finalize, map } from 'rxjs/operators';
+
 import * as dayjs from 'dayjs';
 import { DATE_TIME_FORMAT } from 'app/config/input.constants';
 
@@ -17,7 +19,8 @@ import { CustomerService } from 'app/entities/crm/customer/service/customer.serv
 })
 export class ProductOrderUpdateComponent implements OnInit {
   isSaving = false;
-  customers: ICustomer[] = [];
+
+  customersSharedCollection: ICustomer[] = [];
 
   editForm = this.fb.group({
     id: [],
@@ -32,7 +35,7 @@ export class ProductOrderUpdateComponent implements OnInit {
     protected productOrderService: ProductOrderService,
     protected customerService: CustomerService,
     protected activatedRoute: ActivatedRoute,
-    private fb: FormBuilder
+    protected fb: FormBuilder
   ) {}
 
   ngOnInit(): void {
@@ -44,18 +47,7 @@ export class ProductOrderUpdateComponent implements OnInit {
 
       this.updateForm(productOrder);
 
-      this.customerService.query().subscribe((res: HttpResponse<ICustomer[]>) => (this.customers = res.body ?? []));
-    });
-  }
-
-  updateForm(productOrder: IProductOrder): void {
-    this.editForm.patchValue({
-      id: productOrder.id,
-      placedDate: productOrder.placedDate ? productOrder.placedDate.format(DATE_TIME_FORMAT) : null,
-      status: productOrder.status,
-      code: productOrder.code,
-      invoiceId: productOrder.invoiceId,
-      customer: productOrder.customer,
+      this.loadRelationshipsOptions();
     });
   }
 
@@ -73,7 +65,58 @@ export class ProductOrderUpdateComponent implements OnInit {
     }
   }
 
-  private createFromForm(): IProductOrder {
+  trackCustomerById(index: number, item: ICustomer): number {
+    return item.id!;
+  }
+
+  protected subscribeToSaveResponse(result: Observable<HttpResponse<IProductOrder>>): void {
+    result.pipe(finalize(() => this.onSaveFinalize())).subscribe(
+      () => this.onSaveSuccess(),
+      () => this.onSaveError()
+    );
+  }
+
+  protected onSaveSuccess(): void {
+    this.previousState();
+  }
+
+  protected onSaveError(): void {
+    // Api for inheritance.
+  }
+
+  protected onSaveFinalize(): void {
+    this.isSaving = false;
+  }
+
+  protected updateForm(productOrder: IProductOrder): void {
+    this.editForm.patchValue({
+      id: productOrder.id,
+      placedDate: productOrder.placedDate ? productOrder.placedDate.format(DATE_TIME_FORMAT) : null,
+      status: productOrder.status,
+      code: productOrder.code,
+      invoiceId: productOrder.invoiceId,
+      customer: productOrder.customer,
+    });
+
+    this.customersSharedCollection = this.customerService.addCustomerToCollectionIfMissing(
+      this.customersSharedCollection,
+      productOrder.customer
+    );
+  }
+
+  protected loadRelationshipsOptions(): void {
+    this.customerService
+      .query()
+      .pipe(map((res: HttpResponse<ICustomer[]>) => res.body ?? []))
+      .pipe(
+        map((customers: ICustomer[]) =>
+          this.customerService.addCustomerToCollectionIfMissing(customers, this.editForm.get('customer')!.value)
+        )
+      )
+      .subscribe((customers: ICustomer[]) => (this.customersSharedCollection = customers));
+  }
+
+  protected createFromForm(): IProductOrder {
     return {
       ...new ProductOrder(),
       id: this.editForm.get(['id'])!.value,
@@ -83,25 +126,5 @@ export class ProductOrderUpdateComponent implements OnInit {
       invoiceId: this.editForm.get(['invoiceId'])!.value,
       customer: this.editForm.get(['customer'])!.value,
     };
-  }
-
-  protected subscribeToSaveResponse(result: Observable<HttpResponse<IProductOrder>>): void {
-    result.subscribe(
-      () => this.onSaveSuccess(),
-      () => this.onSaveError()
-    );
-  }
-
-  protected onSaveSuccess(): void {
-    this.isSaving = false;
-    this.previousState();
-  }
-
-  protected onSaveError(): void {
-    this.isSaving = false;
-  }
-
-  trackCustomerById(index: number, item: ICustomer): number {
-    return item.id!;
   }
 }

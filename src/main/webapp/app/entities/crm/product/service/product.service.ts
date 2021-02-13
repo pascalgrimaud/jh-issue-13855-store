@@ -2,18 +2,19 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-import { SERVER_API_URL } from 'app/app.constants';
+import { isPresent } from 'app/core/util/operators';
+import { ConfigService } from 'app/core/config/config.service';
 import { createRequestOption } from 'app/core/request/request-util';
-import { IProduct } from '../product.model';
+import { IProduct, getProductIdentifier } from '../product.model';
 
-type EntityResponseType = HttpResponse<IProduct>;
-type EntityArrayResponseType = HttpResponse<IProduct[]>;
+export type EntityResponseType = HttpResponse<IProduct>;
+export type EntityArrayResponseType = HttpResponse<IProduct[]>;
 
 @Injectable({ providedIn: 'root' })
 export class ProductService {
-  public resourceUrl = SERVER_API_URL + 'services/crm/api/products';
+  public resourceUrl = this.configService.getEndpointFor('api/products', 'crm');
 
-  constructor(protected http: HttpClient) {}
+  constructor(protected http: HttpClient, private configService: ConfigService) {}
 
   create(product: IProduct): Observable<EntityResponseType> {
     return this.http.post<IProduct>(this.resourceUrl, product, { observe: 'response' });
@@ -34,5 +35,22 @@ export class ProductService {
 
   delete(id: number): Observable<HttpResponse<{}>> {
     return this.http.delete(`${this.resourceUrl}/${id}`, { observe: 'response' });
+  }
+
+  addProductToCollectionIfMissing(productCollection: IProduct[], ...productsToCheck: (IProduct | null | undefined)[]): IProduct[] {
+    const products: IProduct[] = productsToCheck.filter(isPresent);
+    if (products.length > 0) {
+      const productCollectionIdentifiers = productCollection.map(productItem => getProductIdentifier(productItem)!);
+      const productsToAdd = products.filter(productItem => {
+        const productIdentifier = getProductIdentifier(productItem);
+        if (productIdentifier == null || productCollectionIdentifiers.includes(productIdentifier)) {
+          return false;
+        }
+        productCollectionIdentifiers.push(productIdentifier);
+        return true;
+      });
+      return [...productsToAdd, ...productCollection];
+    }
+    return productCollection;
   }
 }

@@ -4,18 +4,19 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import * as dayjs from 'dayjs';
 
-import { SERVER_API_URL } from 'app/app.constants';
+import { isPresent } from 'app/core/util/operators';
+import { ConfigService } from 'app/core/config/config.service';
 import { createRequestOption } from 'app/core/request/request-util';
-import { IProductOrder } from '../product-order.model';
+import { IProductOrder, getProductOrderIdentifier } from '../product-order.model';
 
-type EntityResponseType = HttpResponse<IProductOrder>;
-type EntityArrayResponseType = HttpResponse<IProductOrder[]>;
+export type EntityResponseType = HttpResponse<IProductOrder>;
+export type EntityArrayResponseType = HttpResponse<IProductOrder[]>;
 
 @Injectable({ providedIn: 'root' })
 export class ProductOrderService {
-  public resourceUrl = SERVER_API_URL + 'services/crm/api/product-orders';
+  public resourceUrl = this.configService.getEndpointFor('api/product-orders', 'crm');
 
-  constructor(protected http: HttpClient) {}
+  constructor(protected http: HttpClient, private configService: ConfigService) {}
 
   create(productOrder: IProductOrder): Observable<EntityResponseType> {
     const copy = this.convertDateFromClient(productOrder);
@@ -46,6 +47,28 @@ export class ProductOrderService {
 
   delete(id: number): Observable<HttpResponse<{}>> {
     return this.http.delete(`${this.resourceUrl}/${id}`, { observe: 'response' });
+  }
+
+  addProductOrderToCollectionIfMissing(
+    productOrderCollection: IProductOrder[],
+    ...productOrdersToCheck: (IProductOrder | null | undefined)[]
+  ): IProductOrder[] {
+    const productOrders: IProductOrder[] = productOrdersToCheck.filter(isPresent);
+    if (productOrders.length > 0) {
+      const productOrderCollectionIdentifiers = productOrderCollection.map(
+        productOrderItem => getProductOrderIdentifier(productOrderItem)!
+      );
+      const productOrdersToAdd = productOrders.filter(productOrderItem => {
+        const productOrderIdentifier = getProductOrderIdentifier(productOrderItem);
+        if (productOrderIdentifier == null || productOrderCollectionIdentifiers.includes(productOrderIdentifier)) {
+          return false;
+        }
+        productOrderCollectionIdentifiers.push(productOrderIdentifier);
+        return true;
+      });
+      return [...productOrdersToAdd, ...productOrderCollection];
+    }
+    return productOrderCollection;
   }
 
   protected convertDateFromClient(productOrder: IProductOrder): IProductOrder {

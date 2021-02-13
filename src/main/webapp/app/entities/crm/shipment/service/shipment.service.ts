@@ -4,18 +4,19 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import * as dayjs from 'dayjs';
 
-import { SERVER_API_URL } from 'app/app.constants';
+import { isPresent } from 'app/core/util/operators';
+import { ConfigService } from 'app/core/config/config.service';
 import { createRequestOption } from 'app/core/request/request-util';
-import { IShipment } from '../shipment.model';
+import { IShipment, getShipmentIdentifier } from '../shipment.model';
 
-type EntityResponseType = HttpResponse<IShipment>;
-type EntityArrayResponseType = HttpResponse<IShipment[]>;
+export type EntityResponseType = HttpResponse<IShipment>;
+export type EntityArrayResponseType = HttpResponse<IShipment[]>;
 
 @Injectable({ providedIn: 'root' })
 export class ShipmentService {
-  public resourceUrl = SERVER_API_URL + 'services/crm/api/shipments';
+  public resourceUrl = this.configService.getEndpointFor('api/shipments', 'crm');
 
-  constructor(protected http: HttpClient) {}
+  constructor(protected http: HttpClient, private configService: ConfigService) {}
 
   create(shipment: IShipment): Observable<EntityResponseType> {
     const copy = this.convertDateFromClient(shipment);
@@ -46,6 +47,23 @@ export class ShipmentService {
 
   delete(id: number): Observable<HttpResponse<{}>> {
     return this.http.delete(`${this.resourceUrl}/${id}`, { observe: 'response' });
+  }
+
+  addShipmentToCollectionIfMissing(shipmentCollection: IShipment[], ...shipmentsToCheck: (IShipment | null | undefined)[]): IShipment[] {
+    const shipments: IShipment[] = shipmentsToCheck.filter(isPresent);
+    if (shipments.length > 0) {
+      const shipmentCollectionIdentifiers = shipmentCollection.map(shipmentItem => getShipmentIdentifier(shipmentItem)!);
+      const shipmentsToAdd = shipments.filter(shipmentItem => {
+        const shipmentIdentifier = getShipmentIdentifier(shipmentItem);
+        if (shipmentIdentifier == null || shipmentCollectionIdentifiers.includes(shipmentIdentifier)) {
+          return false;
+        }
+        shipmentCollectionIdentifiers.push(shipmentIdentifier);
+        return true;
+      });
+      return [...shipmentsToAdd, ...shipmentCollection];
+    }
+    return shipmentCollection;
   }
 
   protected convertDateFromClient(shipment: IShipment): IShipment {

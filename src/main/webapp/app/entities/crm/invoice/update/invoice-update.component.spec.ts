@@ -1,14 +1,14 @@
 jest.mock('@angular/router');
 
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpResponse } from '@angular/common/http';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { FormBuilder } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 
 import { InvoiceService } from '../service/invoice.service';
-import { Invoice } from '../invoice.model';
+import { IInvoice, Invoice } from '../invoice.model';
 
 import { InvoiceUpdateComponent } from './invoice-update.component';
 
@@ -16,7 +16,8 @@ describe('Component Tests', () => {
   describe('Invoice Management Update Component', () => {
     let comp: InvoiceUpdateComponent;
     let fixture: ComponentFixture<InvoiceUpdateComponent>;
-    let service: InvoiceService;
+    let activatedRoute: ActivatedRoute;
+    let invoiceService: InvoiceService;
 
     beforeEach(() => {
       TestBed.configureTestingModule({
@@ -28,38 +29,85 @@ describe('Component Tests', () => {
         .compileComponents();
 
       fixture = TestBed.createComponent(InvoiceUpdateComponent);
+      activatedRoute = TestBed.inject(ActivatedRoute);
+      invoiceService = TestBed.inject(InvoiceService);
+
       comp = fixture.componentInstance;
-      service = TestBed.inject(InvoiceService);
+    });
+
+    describe('ngOnInit', () => {
+      it('Should update editForm', () => {
+        const invoice: IInvoice = { id: 456 };
+
+        activatedRoute.data = of({ invoice });
+        comp.ngOnInit();
+
+        expect(comp.editForm.value).toEqual(expect.objectContaining(invoice));
+      });
     });
 
     describe('save', () => {
-      it('Should call update service on save for existing entity', fakeAsync(() => {
+      it('Should call update service on save for existing entity', () => {
         // GIVEN
-        const entity = new Invoice(123);
-        spyOn(service, 'update').and.returnValue(of(new HttpResponse({ body: entity })));
-        comp.updateForm(entity);
+        const saveSubject = new Subject();
+        const invoice = new Invoice(123);
+        spyOn(invoiceService, 'update').and.returnValue(saveSubject);
+        spyOn(comp, 'previousState');
+        activatedRoute.data = of({ invoice });
+        comp.ngOnInit();
+
         // WHEN
         comp.save();
-        tick(); // simulate async
+        expect(comp.isSaving).toEqual(true);
+        saveSubject.next(new HttpResponse({ body: invoice }));
+        saveSubject.complete();
 
         // THEN
-        expect(service.update).toHaveBeenCalledWith(entity);
+        expect(comp.previousState).toHaveBeenCalled();
+        expect(invoiceService.update).toHaveBeenCalledWith(invoice);
         expect(comp.isSaving).toEqual(false);
-      }));
+      });
 
-      it('Should call create service on save for new entity', fakeAsync(() => {
+      it('Should call create service on save for new entity', () => {
         // GIVEN
-        const entity = new Invoice();
-        spyOn(service, 'create').and.returnValue(of(new HttpResponse({ body: entity })));
-        comp.updateForm(entity);
+        const saveSubject = new Subject();
+        const invoice = new Invoice();
+        spyOn(invoiceService, 'create').and.returnValue(saveSubject);
+        spyOn(comp, 'previousState');
+        activatedRoute.data = of({ invoice });
+        comp.ngOnInit();
+
         // WHEN
         comp.save();
-        tick(); // simulate async
+        expect(comp.isSaving).toEqual(true);
+        saveSubject.next(new HttpResponse({ body: invoice }));
+        saveSubject.complete();
 
         // THEN
-        expect(service.create).toHaveBeenCalledWith(entity);
+        expect(invoiceService.create).toHaveBeenCalledWith(invoice);
         expect(comp.isSaving).toEqual(false);
-      }));
+        expect(comp.previousState).toHaveBeenCalled();
+      });
+
+      it('Should set isSaving to false on error', () => {
+        // GIVEN
+        const saveSubject = new Subject();
+        const invoice = new Invoice(123);
+        spyOn(invoiceService, 'update').and.returnValue(saveSubject);
+        spyOn(comp, 'previousState');
+        activatedRoute.data = of({ invoice });
+        comp.ngOnInit();
+
+        // WHEN
+        comp.save();
+        expect(comp.isSaving).toEqual(true);
+        saveSubject.error('This is an error!');
+
+        // THEN
+        expect(invoiceService.update).toHaveBeenCalledWith(invoice);
+        expect(comp.isSaving).toEqual(false);
+        expect(comp.previousState).not.toHaveBeenCalled();
+      });
     });
   });
 });

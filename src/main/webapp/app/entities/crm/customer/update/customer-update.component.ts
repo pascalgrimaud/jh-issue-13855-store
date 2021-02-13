@@ -3,6 +3,7 @@ import { HttpResponse } from '@angular/common/http';
 import { FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { Observable } from 'rxjs';
+import { finalize } from 'rxjs/operators';
 
 import { ICustomer, Customer } from '../customer.model';
 import { CustomerService } from '../service/customer.service';
@@ -27,26 +28,11 @@ export class CustomerUpdateComponent implements OnInit {
     country: [null, [Validators.required]],
   });
 
-  constructor(protected customerService: CustomerService, protected activatedRoute: ActivatedRoute, private fb: FormBuilder) {}
+  constructor(protected customerService: CustomerService, protected activatedRoute: ActivatedRoute, protected fb: FormBuilder) {}
 
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ customer }) => {
       this.updateForm(customer);
-    });
-  }
-
-  updateForm(customer: ICustomer): void {
-    this.editForm.patchValue({
-      id: customer.id,
-      firstName: customer.firstName,
-      lastName: customer.lastName,
-      gender: customer.gender,
-      email: customer.email,
-      phone: customer.phone,
-      addressLine1: customer.addressLine1,
-      addressLine2: customer.addressLine2,
-      city: customer.city,
-      country: customer.country,
     });
   }
 
@@ -64,7 +50,41 @@ export class CustomerUpdateComponent implements OnInit {
     }
   }
 
-  private createFromForm(): ICustomer {
+  protected subscribeToSaveResponse(result: Observable<HttpResponse<ICustomer>>): void {
+    result.pipe(finalize(() => this.onSaveFinalize())).subscribe(
+      () => this.onSaveSuccess(),
+      () => this.onSaveError()
+    );
+  }
+
+  protected onSaveSuccess(): void {
+    this.previousState();
+  }
+
+  protected onSaveError(): void {
+    // Api for inheritance.
+  }
+
+  protected onSaveFinalize(): void {
+    this.isSaving = false;
+  }
+
+  protected updateForm(customer: ICustomer): void {
+    this.editForm.patchValue({
+      id: customer.id,
+      firstName: customer.firstName,
+      lastName: customer.lastName,
+      gender: customer.gender,
+      email: customer.email,
+      phone: customer.phone,
+      addressLine1: customer.addressLine1,
+      addressLine2: customer.addressLine2,
+      city: customer.city,
+      country: customer.country,
+    });
+  }
+
+  protected createFromForm(): ICustomer {
     return {
       ...new Customer(),
       id: this.editForm.get(['id'])!.value,
@@ -78,21 +98,5 @@ export class CustomerUpdateComponent implements OnInit {
       city: this.editForm.get(['city'])!.value,
       country: this.editForm.get(['country'])!.value,
     };
-  }
-
-  protected subscribeToSaveResponse(result: Observable<HttpResponse<ICustomer>>): void {
-    result.subscribe(
-      () => this.onSaveSuccess(),
-      () => this.onSaveError()
-    );
-  }
-
-  protected onSaveSuccess(): void {
-    this.isSaving = false;
-    this.previousState();
-  }
-
-  protected onSaveError(): void {
-    this.isSaving = false;
   }
 }

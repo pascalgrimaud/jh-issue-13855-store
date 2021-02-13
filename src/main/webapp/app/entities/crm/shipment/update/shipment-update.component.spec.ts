@@ -1,15 +1,16 @@
 jest.mock('@angular/router');
 
-import { ComponentFixture, TestBed, fakeAsync, tick } from '@angular/core/testing';
+import { ComponentFixture, TestBed } from '@angular/core/testing';
 import { HttpResponse } from '@angular/common/http';
 import { HttpClientTestingModule } from '@angular/common/http/testing';
 import { FormBuilder } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
-import { of } from 'rxjs';
+import { of, Subject } from 'rxjs';
 
 import { ShipmentService } from '../service/shipment.service';
-import { Shipment } from '../shipment.model';
-import { Invoice } from 'app/entities/crm/invoice/invoice.model';
+import { IShipment, Shipment } from '../shipment.model';
+import { IInvoice, Invoice } from 'app/entities/crm/invoice/invoice.model';
+import { InvoiceService } from 'app/entities/crm/invoice/service/invoice.service';
 
 import { ShipmentUpdateComponent } from './shipment-update.component';
 
@@ -17,7 +18,9 @@ describe('Component Tests', () => {
   describe('Shipment Management Update Component', () => {
     let comp: ShipmentUpdateComponent;
     let fixture: ComponentFixture<ShipmentUpdateComponent>;
-    let service: ShipmentService;
+    let activatedRoute: ActivatedRoute;
+    let shipmentService: ShipmentService;
+    let invoiceService: InvoiceService;
 
     beforeEach(() => {
       TestBed.configureTestingModule({
@@ -29,38 +32,108 @@ describe('Component Tests', () => {
         .compileComponents();
 
       fixture = TestBed.createComponent(ShipmentUpdateComponent);
+      activatedRoute = TestBed.inject(ActivatedRoute);
+      shipmentService = TestBed.inject(ShipmentService);
+      invoiceService = TestBed.inject(InvoiceService);
+
       comp = fixture.componentInstance;
-      service = TestBed.inject(ShipmentService);
+    });
+
+    describe('ngOnInit', () => {
+      it('Should call Invoice query and add missing value', () => {
+        const shipment: IShipment = { id: 456 };
+        const invoice: IInvoice = { id: 15084 };
+        shipment.invoice = invoice;
+
+        const invoiceCollection: IInvoice[] = [{ id: 20822 }];
+        spyOn(invoiceService, 'query').and.returnValue(of(new HttpResponse({ body: invoiceCollection })));
+        const additionalInvoices = [invoice];
+        const expectedCollection: IInvoice[] = [...additionalInvoices, ...invoiceCollection];
+        spyOn(invoiceService, 'addInvoiceToCollectionIfMissing').and.returnValue(expectedCollection);
+
+        activatedRoute.data = of({ shipment });
+        comp.ngOnInit();
+
+        expect(invoiceService.query).toHaveBeenCalled();
+        expect(invoiceService.addInvoiceToCollectionIfMissing).toHaveBeenCalledWith(invoiceCollection, ...additionalInvoices);
+        expect(comp.invoicesSharedCollection).toEqual(expectedCollection);
+      });
+
+      it('Should update editForm', () => {
+        const shipment: IShipment = { id: 456 };
+        const invoice: IInvoice = { id: 64437 };
+        shipment.invoice = invoice;
+
+        activatedRoute.data = of({ shipment });
+        comp.ngOnInit();
+
+        expect(comp.editForm.value).toEqual(expect.objectContaining(shipment));
+        expect(comp.invoicesSharedCollection).toContain(invoice);
+      });
     });
 
     describe('save', () => {
-      it('Should call update service on save for existing entity', fakeAsync(() => {
+      it('Should call update service on save for existing entity', () => {
         // GIVEN
-        const entity = new Shipment(123);
-        spyOn(service, 'update').and.returnValue(of(new HttpResponse({ body: entity })));
-        comp.updateForm(entity);
+        const saveSubject = new Subject();
+        const shipment = new Shipment(123);
+        spyOn(shipmentService, 'update').and.returnValue(saveSubject);
+        spyOn(comp, 'previousState');
+        activatedRoute.data = of({ shipment });
+        comp.ngOnInit();
+
         // WHEN
         comp.save();
-        tick(); // simulate async
+        expect(comp.isSaving).toEqual(true);
+        saveSubject.next(new HttpResponse({ body: shipment }));
+        saveSubject.complete();
 
         // THEN
-        expect(service.update).toHaveBeenCalledWith(entity);
+        expect(comp.previousState).toHaveBeenCalled();
+        expect(shipmentService.update).toHaveBeenCalledWith(shipment);
         expect(comp.isSaving).toEqual(false);
-      }));
+      });
 
-      it('Should call create service on save for new entity', fakeAsync(() => {
+      it('Should call create service on save for new entity', () => {
         // GIVEN
-        const entity = new Shipment();
-        spyOn(service, 'create').and.returnValue(of(new HttpResponse({ body: entity })));
-        comp.updateForm(entity);
+        const saveSubject = new Subject();
+        const shipment = new Shipment();
+        spyOn(shipmentService, 'create').and.returnValue(saveSubject);
+        spyOn(comp, 'previousState');
+        activatedRoute.data = of({ shipment });
+        comp.ngOnInit();
+
         // WHEN
         comp.save();
-        tick(); // simulate async
+        expect(comp.isSaving).toEqual(true);
+        saveSubject.next(new HttpResponse({ body: shipment }));
+        saveSubject.complete();
 
         // THEN
-        expect(service.create).toHaveBeenCalledWith(entity);
+        expect(shipmentService.create).toHaveBeenCalledWith(shipment);
         expect(comp.isSaving).toEqual(false);
-      }));
+        expect(comp.previousState).toHaveBeenCalled();
+      });
+
+      it('Should set isSaving to false on error', () => {
+        // GIVEN
+        const saveSubject = new Subject();
+        const shipment = new Shipment(123);
+        spyOn(shipmentService, 'update').and.returnValue(saveSubject);
+        spyOn(comp, 'previousState');
+        activatedRoute.data = of({ shipment });
+        comp.ngOnInit();
+
+        // WHEN
+        comp.save();
+        expect(comp.isSaving).toEqual(true);
+        saveSubject.error('This is an error!');
+
+        // THEN
+        expect(shipmentService.update).toHaveBeenCalledWith(shipment);
+        expect(comp.isSaving).toEqual(false);
+        expect(comp.previousState).not.toHaveBeenCalled();
+      });
     });
 
     describe('Tracking relationships identifiers', () => {

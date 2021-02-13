@@ -24,3 +24,7 @@ export class ProductOrder implements IProductOrder {
     public customer?: ICustomer
   ) {}
 }
+
+export function getProductOrderIdentifier(productOrder: IProductOrder): number | undefined {
+  return productOrder.id;
+}

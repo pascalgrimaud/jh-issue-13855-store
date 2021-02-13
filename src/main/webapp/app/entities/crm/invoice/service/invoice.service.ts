@@ -4,18 +4,19 @@ import { Observable } from 'rxjs';
 import { map } from 'rxjs/operators';
 import * as dayjs from 'dayjs';
 
-import { SERVER_API_URL } from 'app/app.constants';
+import { isPresent } from 'app/core/util/operators';
+import { ConfigService } from 'app/core/config/config.service';
 import { createRequestOption } from 'app/core/request/request-util';
-import { IInvoice } from '../invoice.model';
+import { IInvoice, getInvoiceIdentifier } from '../invoice.model';
 
-type EntityResponseType = HttpResponse<IInvoice>;
-type EntityArrayResponseType = HttpResponse<IInvoice[]>;
+export type EntityResponseType = HttpResponse<IInvoice>;
+export type EntityArrayResponseType = HttpResponse<IInvoice[]>;
 
 @Injectable({ providedIn: 'root' })
 export class InvoiceService {
-  public resourceUrl = SERVER_API_URL + 'services/crm/api/invoices';
+  public resourceUrl = this.configService.getEndpointFor('api/invoices', 'crm');
 
-  constructor(protected http: HttpClient) {}
+  constructor(protected http: HttpClient, private configService: ConfigService) {}
 
   create(invoice: IInvoice): Observable<EntityResponseType> {
     const copy = this.convertDateFromClient(invoice);
@@ -46,6 +47,23 @@ export class InvoiceService {
 
   delete(id: number): Observable<HttpResponse<{}>> {
     return this.http.delete(`${this.resourceUrl}/${id}`, { observe: 'response' });
+  }
+
+  addInvoiceToCollectionIfMissing(invoiceCollection: IInvoice[], ...invoicesToCheck: (IInvoice | null | undefined)[]): IInvoice[] {
+    const invoices: IInvoice[] = invoicesToCheck.filter(isPresent);
+    if (invoices.length > 0) {
+      const invoiceCollectionIdentifiers = invoiceCollection.map(invoiceItem => getInvoiceIdentifier(invoiceItem)!);
+      const invoicesToAdd = invoices.filter(invoiceItem => {
+        const invoiceIdentifier = getInvoiceIdentifier(invoiceItem);
+        if (invoiceIdentifier == null || invoiceCollectionIdentifiers.includes(invoiceIdentifier)) {
+          return false;
+        }
+        invoiceCollectionIdentifiers.push(invoiceIdentifier);
+        return true;
+      });
+      return [...invoicesToAdd, ...invoiceCollection];
+    }
+    return invoiceCollection;
   }
 
   protected convertDateFromClient(invoice: IInvoice): IInvoice {

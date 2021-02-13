@@ -9,7 +9,7 @@ import { ShipmentService } from '../service/shipment.service';
 
 @Injectable({ providedIn: 'root' })
 export class ShipmentRoutingResolveService implements Resolve<IShipment> {
-  constructor(private service: ShipmentService, private router: Router) {}
+  constructor(protected service: ShipmentService, protected router: Router) {}
 
   resolve(route: ActivatedRouteSnapshot): Observable<IShipment> | Observable<never> {
     const id = route.params['id'];

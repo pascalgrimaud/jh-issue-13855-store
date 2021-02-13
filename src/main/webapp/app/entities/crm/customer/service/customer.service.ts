@@ -2,18 +2,19 @@ import { Injectable } from '@angular/core';
 import { HttpClient, HttpResponse } from '@angular/common/http';
 import { Observable } from 'rxjs';
 
-import { SERVER_API_URL } from 'app/app.constants';
+import { isPresent } from 'app/core/util/operators';
+import { ConfigService } from 'app/core/config/config.service';
 import { createRequestOption } from 'app/core/request/request-util';
-import { ICustomer } from '../customer.model';
+import { ICustomer, getCustomerIdentifier } from '../customer.model';
 
-type EntityResponseType = HttpResponse<ICustomer>;
-type EntityArrayResponseType = HttpResponse<ICustomer[]>;
+export type EntityResponseType = HttpResponse<ICustomer>;
+export type EntityArrayResponseType = HttpResponse<ICustomer[]>;
 
 @Injectable({ providedIn: 'root' })
 export class CustomerService {
-  public resourceUrl = SERVER_API_URL + 'services/crm/api/customers';
+  public resourceUrl = this.configService.getEndpointFor('api/customers', 'crm');
 
-  constructor(protected http: HttpClient) {}
+  constructor(protected http: HttpClient, private configService: ConfigService) {}
 
   create(customer: ICustomer): Observable<EntityResponseType> {
     return this.http.post<ICustomer>(this.resourceUrl, customer, { observe: 'response' });
@@ -34,5 +35,22 @@ export class CustomerService {
 
   delete(id: number): Observable<HttpResponse<{}>> {
     return this.http.delete(`${this.resourceUrl}/${id}`, { observe: 'response' });
+  }
+
+  addCustomerToCollectionIfMissing(customerCollection: ICustomer[], ...customersToCheck: (ICustomer | null | undefined)[]): ICustomer[] {
+    const customers: ICustomer[] = customersToCheck.filter(isPresent);
+    if (customers.length > 0) {
+      const customerCollectionIdentifiers = customerCollection.map(customerItem => getCustomerIdentifier(customerItem)!);
+      const customersToAdd = customers.filter(customerItem => {
+        const customerIdentifier = getCustomerIdentifier(customerItem);
+        if (customerIdentifier == null || customerCollectionIdentifiers.includes(customerIdentifier)) {
+          return false;
+        }
+        customerCollectionIdentifiers.push(customerIdentifier);
+        return true;
+      });
+      return [...customersToAdd, ...customerCollection];
+    }
+    return customerCollection;
   }
 }

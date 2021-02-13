@@ -21,3 +21,7 @@ export class OrderItem implements IOrderItem {
     public order?: IProductOrder
   ) {}
 }
+
+export function getOrderItemIdentifier(orderItem: IOrderItem): number | undefined {
+  return orderItem.id;
+}

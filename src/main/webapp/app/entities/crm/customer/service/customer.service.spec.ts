@@ -112,6 +112,58 @@ describe('Service Tests', () => {
         req.flush({ status: 200 });
         expect(expectedResult);
       });
+
+      describe('addCustomerToCollectionIfMissing', () => {
+        it('should add a Customer to an empty array', () => {
+          const customer: ICustomer = { id: 123 };
+          expectedResult = service.addCustomerToCollectionIfMissing([], customer);
+          expect(expectedResult).toHaveLength(1);
+          expect(expectedResult).toContain(customer);
+        });
+
+        it('should not add a Customer to an array that contains it', () => {
+          const customer: ICustomer = { id: 123 };
+          const customerCollection: ICustomer[] = [
+            {
+              ...customer,
+            },
+            { id: 456 },
+          ];
+          expectedResult = service.addCustomerToCollectionIfMissing(customerCollection, customer);
+          expect(expectedResult).toHaveLength(2);
+        });
+
+        it("should add a Customer to an array that doesn't contain it", () => {
+          const customer: ICustomer = { id: 123 };
+          const customerCollection: ICustomer[] = [{ id: 456 }];
+          expectedResult = service.addCustomerToCollectionIfMissing(customerCollection, customer);
+          expect(expectedResult).toHaveLength(2);
+          expect(expectedResult).toContain(customer);
+        });
+
+        it('should add only unique Customer to an array', () => {
+          const customerArray: ICustomer[] = [{ id: 123 }, { id: 456 }, { id: 17974 }];
+          const customerCollection: ICustomer[] = [{ id: 456 }];
+          expectedResult = service.addCustomerToCollectionIfMissing(customerCollection, ...customerArray);
+          expect(expectedResult).toHaveLength(3);
+        });
+
+        it('should accept varargs', () => {
+          const customer: ICustomer = { id: 123 };
+          const customer2: ICustomer = { id: 456 };
+          expectedResult = service.addCustomerToCollectionIfMissing([], customer, customer2);
+          expect(expectedResult).toHaveLength(2);
+          expect(expectedResult).toContain(customer);
+          expect(expectedResult).toContain(customer2);
+        });
+
+        it('should accept null and undefined values', () => {
+          const customer: ICustomer = { id: 123 };
+          expectedResult = service.addCustomerToCollectionIfMissing([], null, customer, undefined);
+          expect(expectedResult).toHaveLength(1);
+          expect(expectedResult).toContain(customer);
+        });
+      });
     });
 
     afterEach(() => {

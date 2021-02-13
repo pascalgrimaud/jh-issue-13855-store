@@ -30,3 +30,7 @@ export class Customer implements ICustomer {
     public orders?: IProductOrder[] | null
   ) {}
 }
+
+export function getCustomerIdentifier(customer: ICustomer): number | undefined {
+  return customer.id;
+}

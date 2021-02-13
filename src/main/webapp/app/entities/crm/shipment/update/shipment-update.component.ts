@@ -3,6 +3,8 @@ import { HttpResponse } from '@angular/common/http';
 import { FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { Observable } from 'rxjs';
+import { finalize, map } from 'rxjs/operators';
+
 import * as dayjs from 'dayjs';
 import { DATE_TIME_FORMAT } from 'app/config/input.constants';
 
@@ -17,7 +19,8 @@ import { InvoiceService } from 'app/entities/crm/invoice/service/invoice.service
 })
 export class ShipmentUpdateComponent implements OnInit {
   isSaving = false;
-  invoices: IInvoice[] = [];
+
+  invoicesSharedCollection: IInvoice[] = [];
 
   editForm = this.fb.group({
     id: [],
@@ -31,7 +34,7 @@ export class ShipmentUpdateComponent implements OnInit {
     protected shipmentService: ShipmentService,
     protected invoiceService: InvoiceService,
     protected activatedRoute: ActivatedRoute,
-    private fb: FormBuilder
+    protected fb: FormBuilder
   ) {}
 
   ngOnInit(): void {
@@ -43,17 +46,7 @@ export class ShipmentUpdateComponent implements OnInit {
 
       this.updateForm(shipment);
 
-      this.invoiceService.query().subscribe((res: HttpResponse<IInvoice[]>) => (this.invoices = res.body ?? []));
-    });
-  }
-
-  updateForm(shipment: IShipment): void {
-    this.editForm.patchValue({
-      id: shipment.id,
-      trackingCode: shipment.trackingCode,
-      date: shipment.date ? shipment.date.format(DATE_TIME_FORMAT) : null,
-      details: shipment.details,
-      invoice: shipment.invoice,
+      this.loadRelationshipsOptions();
     });
   }
 
@@ -71,7 +64,52 @@ export class ShipmentUpdateComponent implements OnInit {
     }
   }
 
-  private createFromForm(): IShipment {
+  trackInvoiceById(index: number, item: IInvoice): number {
+    return item.id!;
+  }
+
+  protected subscribeToSaveResponse(result: Observable<HttpResponse<IShipment>>): void {
+    result.pipe(finalize(() => this.onSaveFinalize())).subscribe(
+      () => this.onSaveSuccess(),
+      () => this.onSaveError()
+    );
+  }
+
+  protected onSaveSuccess(): void {
+    this.previousState();
+  }
+
+  protected onSaveError(): void {
+    // Api for inheritance.
+  }
+
+  protected onSaveFinalize(): void {
+    this.isSaving = false;
+  }
+
+  protected updateForm(shipment: IShipment): void {
+    this.editForm.patchValue({
+      id: shipment.id,
+      trackingCode: shipment.trackingCode,
+      date: shipment.date ? shipment.date.format(DATE_TIME_FORMAT) : null,
+      details: shipment.details,
+      invoice: shipment.invoice,
+    });
+
+    this.invoicesSharedCollection = this.invoiceService.addInvoiceToCollectionIfMissing(this.invoicesSharedCollection, shipment.invoice);
+  }
+
+  protected loadRelationshipsOptions(): void {
+    this.invoiceService
+      .query()
+      .pipe(map((res: HttpResponse<IInvoice[]>) => res.body ?? []))
+      .pipe(
+        map((invoices: IInvoice[]) => this.invoiceService.addInvoiceToCollectionIfMissing(invoices, this.editForm.get('invoice')!.value))
+      )
+      .subscribe((invoices: IInvoice[]) => (this.invoicesSharedCollection = invoices));
+  }
+
+  protected createFromForm(): IShipment {
     return {
       ...new Shipment(),
       id: this.editForm.get(['id'])!.value,
@@ -80,25 +118,5 @@ export class ShipmentUpdateComponent implements OnInit {
       details: this.editForm.get(['details'])!.value,
       invoice: this.editForm.get(['invoice'])!.value,
     };
-  }
-
-  protected subscribeToSaveResponse(result: Observable<HttpResponse<IShipment>>): void {
-    result.subscribe(
-      () => this.onSaveSuccess(),
-      () => this.onSaveError()
-    );
-  }
-
-  protected onSaveSuccess(): void {
-    this.isSaving = false;
-    this.previousState();
-  }
-
-  protected onSaveError(): void {
-    this.isSaving = false;
-  }
-
-  trackInvoiceById(index: number, item: IInvoice): number {
-    return item.id!;
   }
 }

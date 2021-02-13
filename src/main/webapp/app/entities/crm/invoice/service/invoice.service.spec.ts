@@ -139,6 +139,58 @@ describe('Service Tests', () => {
         req.flush({ status: 200 });
         expect(expectedResult);
       });
+
+      describe('addInvoiceToCollectionIfMissing', () => {
+        it('should add a Invoice to an empty array', () => {
+          const invoice: IInvoice = { id: 123 };
+          expectedResult = service.addInvoiceToCollectionIfMissing([], invoice);
+          expect(expectedResult).toHaveLength(1);
+          expect(expectedResult).toContain(invoice);
+        });
+
+        it('should not add a Invoice to an array that contains it', () => {
+          const invoice: IInvoice = { id: 123 };
+          const invoiceCollection: IInvoice[] = [
+            {
+              ...invoice,
+            },
+            { id: 456 },
+          ];
+          expectedResult = service.addInvoiceToCollectionIfMissing(invoiceCollection, invoice);
+          expect(expectedResult).toHaveLength(2);
+        });
+
+        it("should add a Invoice to an array that doesn't contain it", () => {
+          const invoice: IInvoice = { id: 123 };
+          const invoiceCollection: IInvoice[] = [{ id: 456 }];
+          expectedResult = service.addInvoiceToCollectionIfMissing(invoiceCollection, invoice);
+          expect(expectedResult).toHaveLength(2);
+          expect(expectedResult).toContain(invoice);
+        });
+
+        it('should add only unique Invoice to an array', () => {
+          const invoiceArray: IInvoice[] = [{ id: 123 }, { id: 456 }, { id: 65218 }];
+          const invoiceCollection: IInvoice[] = [{ id: 456 }];
+          expectedResult = service.addInvoiceToCollectionIfMissing(invoiceCollection, ...invoiceArray);
+          expect(expectedResult).toHaveLength(3);
+        });
+
+        it('should accept varargs', () => {
+          const invoice: IInvoice = { id: 123 };
+          const invoice2: IInvoice = { id: 456 };
+          expectedResult = service.addInvoiceToCollectionIfMissing([], invoice, invoice2);
+          expect(expectedResult).toHaveLength(2);
+          expect(expectedResult).toContain(invoice);
+          expect(expectedResult).toContain(invoice2);
+        });
+
+        it('should accept null and undefined values', () => {
+          const invoice: IInvoice = { id: 123 };
+          expectedResult = service.addInvoiceToCollectionIfMissing([], null, invoice, undefined);
+          expect(expectedResult).toHaveLength(1);
+          expect(expectedResult).toContain(invoice);
+        });
+      });
     });
 
     afterEach(() => {

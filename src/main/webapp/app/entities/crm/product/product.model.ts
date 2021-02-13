@@ -21,3 +21,7 @@ export class Product implements IProduct {
     public image?: string | null
   ) {}
 }
+
+export function getProductIdentifier(product: IProduct): number | undefined {
+  return product.id;
+}

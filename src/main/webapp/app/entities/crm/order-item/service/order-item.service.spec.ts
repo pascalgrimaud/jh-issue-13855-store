@@ -100,6 +100,58 @@ describe('Service Tests', () => {
         req.flush({ status: 200 });
         expect(expectedResult);
       });
+
+      describe('addOrderItemToCollectionIfMissing', () => {
+        it('should add a OrderItem to an empty array', () => {
+          const orderItem: IOrderItem = { id: 123 };
+          expectedResult = service.addOrderItemToCollectionIfMissing([], orderItem);
+          expect(expectedResult).toHaveLength(1);
+          expect(expectedResult).toContain(orderItem);
+        });
+
+        it('should not add a OrderItem to an array that contains it', () => {
+          const orderItem: IOrderItem = { id: 123 };
+          const orderItemCollection: IOrderItem[] = [
+            {
+              ...orderItem,
+            },
+            { id: 456 },
+          ];
+          expectedResult = service.addOrderItemToCollectionIfMissing(orderItemCollection, orderItem);
+          expect(expectedResult).toHaveLength(2);
+        });
+
+        it("should add a OrderItem to an array that doesn't contain it", () => {
+          const orderItem: IOrderItem = { id: 123 };
+          const orderItemCollection: IOrderItem[] = [{ id: 456 }];
+          expectedResult = service.addOrderItemToCollectionIfMissing(orderItemCollection, orderItem);
+          expect(expectedResult).toHaveLength(2);
+          expect(expectedResult).toContain(orderItem);
+        });
+
+        it('should add only unique OrderItem to an array', () => {
+          const orderItemArray: IOrderItem[] = [{ id: 123 }, { id: 456 }, { id: 12024 }];
+          const orderItemCollection: IOrderItem[] = [{ id: 456 }];
+          expectedResult = service.addOrderItemToCollectionIfMissing(orderItemCollection, ...orderItemArray);
+          expect(expectedResult).toHaveLength(3);
+        });
+
+        it('should accept varargs', () => {
+          const orderItem: IOrderItem = { id: 123 };
+          const orderItem2: IOrderItem = { id: 456 };
+          expectedResult = service.addOrderItemToCollectionIfMissing([], orderItem, orderItem2);
+          expect(expectedResult).toHaveLength(2);
+          expect(expectedResult).toContain(orderItem);
+          expect(expectedResult).toContain(orderItem2);
+        });
+
+        it('should accept null and undefined values', () => {
+          const orderItem: IOrderItem = { id: 123 };
+          expectedResult = service.addOrderItemToCollectionIfMissing([], null, orderItem, undefined);
+          expect(expectedResult).toHaveLength(1);
+          expect(expectedResult).toContain(orderItem);
+        });
+      });
     });
 
     afterEach(() => {

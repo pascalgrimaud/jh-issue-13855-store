@@ -15,7 +15,7 @@ describe('Shipment e2e test', () => {
   beforeEach(() => {
     cy.getOauth2Data();
     cy.get('@oauth2Data').then(oauth2Data => {
-      cy.keycloackLogin(oauth2Data, 'user');
+      cy.oauthLogin(oauth2Data, Cypress.env('E2E_USERNAME') || 'admin', Cypress.env('E2E_PASSWORD') || 'admin');
     });
     cy.intercept('GET', '/services/crm/api/shipments*').as('entitiesRequest');
     cy.visit('');
@@ -26,7 +26,7 @@ describe('Shipment e2e test', () => {
 
   afterEach(() => {
     cy.get('@oauth2Data').then(oauth2Data => {
-      cy.keycloackLogout(oauth2Data);
+      cy.oauthLogout(oauth2Data);
     });
     cy.clearCache();
   });
@@ -87,17 +87,18 @@ describe('Shipment e2e test', () => {
     cy.intercept('GET', '/services/crm/api/shipments*').as('entitiesRequest');
     cy.visit('/');
     cy.clickOnEntityMenuItem('shipment');
-    cy.wait('@entitiesRequest');
+    cy.wait('@entitiesRequest')
+      .then(({ request, response }) => startingEntitiesCount = response.body.length);
     cy.get(entityCreateButtonSelector).click({force: true});
     cy.getEntityCreateUpdateHeading('Shipment');
 
-    cy.get(`[data-cy="trackingCode"]`).type('Mouse Villages', { force: true }).invoke('val').should('match', new RegExp('Mouse Villages'));
+    cy.get(`[data-cy="trackingCode"]`).type('Mobility Account', { force: true }).invoke('val').should('match', new RegExp('Mobility Account'));
 
 
-    cy.get(`[data-cy="date"]`).type('2021-02-12T21:49').invoke('val').should('equal', '2021-02-12T21:49');
+    cy.get(`[data-cy="date"]`).type('2021-02-12T20:40').invoke('val').should('equal', '2021-02-12T20:40');
 
 
-    cy.get(`[data-cy="details"]`).type('unleash integrate', { force: true }).invoke('val').should('match', new RegExp('unleash integrate'));
+    cy.get(`[data-cy="details"]`).type('Practical Plains', { force: true }).invoke('val').should('match', new RegExp('Practical Plains'));
 
     cy.setFieldSelectToLastOfEntity('invoice');
 

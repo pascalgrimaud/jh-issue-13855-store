@@ -22,7 +22,7 @@ services:
   store-postgresql:
     image: postgres:13.1
     # volumes:
-    #     - ~/volumes/jhipster/store/postgresql/:/var/lib/postgresql/data/
+    #   - ~/volumes/jhipster/store/postgresql/:/var/lib/postgresql/data/
     environment:
       - POSTGRES_USER=store
       - POSTGRES_PASSWORD=

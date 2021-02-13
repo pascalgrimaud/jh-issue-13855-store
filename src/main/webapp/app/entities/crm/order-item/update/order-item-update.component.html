@@ -99,7 +99,7 @@
             <option *ngIf="!editForm.get('product')!.value" [ngValue]="null" selected></option>
             <option
               [ngValue]="productOption.id === editForm.get('product')!.value?.id ? editForm.get('product')!.value : productOption"
-              *ngFor="let productOption of products; trackBy: trackProductById"
+              *ngFor="let productOption of productsSharedCollection; trackBy: trackProductById"
             >
               {{ productOption.name }}
             </option>
@@ -121,7 +121,7 @@
             <option *ngIf="!editForm.get('order')!.value" [ngValue]="null" selected></option>
             <option
               [ngValue]="productOrderOption.id === editForm.get('order')!.value?.id ? editForm.get('order')!.value : productOrderOption"
-              *ngFor="let productOrderOption of productorders; trackBy: trackProductOrderById"
+              *ngFor="let productOrderOption of productOrdersSharedCollection; trackBy: trackProductOrderById"
             >
               {{ productOrderOption.code }}
             </option>

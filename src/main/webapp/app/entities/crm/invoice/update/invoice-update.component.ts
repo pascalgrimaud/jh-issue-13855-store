@@ -3,6 +3,8 @@ import { HttpResponse } from '@angular/common/http';
 import { FormBuilder, Validators } from '@angular/forms';
 import { ActivatedRoute } from '@angular/router';
 import { Observable } from 'rxjs';
+import { finalize } from 'rxjs/operators';
+
 import * as dayjs from 'dayjs';
 import { DATE_TIME_FORMAT } from 'app/config/input.constants';
 
@@ -27,7 +29,7 @@ export class InvoiceUpdateComponent implements OnInit {
     paymentAmount: [null, [Validators.required]],
   });
 
-  constructor(protected invoiceService: InvoiceService, protected activatedRoute: ActivatedRoute, private fb: FormBuilder) {}
+  constructor(protected invoiceService: InvoiceService, protected activatedRoute: ActivatedRoute, protected fb: FormBuilder) {}
 
   ngOnInit(): void {
     this.activatedRoute.data.subscribe(({ invoice }) => {
@@ -38,19 +40,6 @@ export class InvoiceUpdateComponent implements OnInit {
       }
 
       this.updateForm(invoice);
-    });
-  }
-
-  updateForm(invoice: IInvoice): void {
-    this.editForm.patchValue({
-      id: invoice.id,
-      code: invoice.code,
-      date: invoice.date ? invoice.date.format(DATE_TIME_FORMAT) : null,
-      details: invoice.details,
-      status: invoice.status,
-      paymentMethod: invoice.paymentMethod,
-      paymentDate: invoice.paymentDate ? invoice.paymentDate.format(DATE_TIME_FORMAT) : null,
-      paymentAmount: invoice.paymentAmount,
     });
   }
 
@@ -68,7 +57,39 @@ export class InvoiceUpdateComponent implements OnInit {
     }
   }
 
-  private createFromForm(): IInvoice {
+  protected subscribeToSaveResponse(result: Observable<HttpResponse<IInvoice>>): void {
+    result.pipe(finalize(() => this.onSaveFinalize())).subscribe(
+      () => this.onSaveSuccess(),
+      () => this.onSaveError()
+    );
+  }
+
+  protected onSaveSuccess(): void {
+    this.previousState();
+  }
+
+  protected onSaveError(): void {
+    // Api for inheritance.
+  }
+
+  protected onSaveFinalize(): void {
+    this.isSaving = false;
+  }
+
+  protected updateForm(invoice: IInvoice): void {
+    this.editForm.patchValue({
+      id: invoice.id,
+      code: invoice.code,
+      date: invoice.date ? invoice.date.format(DATE_TIME_FORMAT) : null,
+      details: invoice.details,
+      status: invoice.status,
+      paymentMethod: invoice.paymentMethod,
+      paymentDate: invoice.paymentDate ? invoice.paymentDate.format(DATE_TIME_FORMAT) : null,
+      paymentAmount: invoice.paymentAmount,
+    });
+  }
+
+  protected createFromForm(): IInvoice {
     return {
       ...new Invoice(),
       id: this.editForm.get(['id'])!.value,
@@ -82,21 +103,5 @@ export class InvoiceUpdateComponent implements OnInit {
         : undefined,
       paymentAmount: this.editForm.get(['paymentAmount'])!.value,
     };
-  }
-
-  protected subscribeToSaveResponse(result: Observable<HttpResponse<IInvoice>>): void {
-    result.subscribe(
-      () => this.onSaveSuccess(),
-      () => this.onSaveError()
-    );
-  }
-
-  protected onSaveSuccess(): void {
-    this.isSaving = false;
-    this.previousState();
-  }
-
-  protected onSaveError(): void {
-    this.isSaving = false;
   }
 }
